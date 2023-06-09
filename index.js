@@ -2,21 +2,21 @@ const http = require('http')
 const { exec } = require('child_process')
 
 const port = 41420
-const tv_on_script = '/home/onhq/tvScripts/tv_on.sh' //NOT REQUIRED
-const tv_off_script = '/home/onhq/tvScripts/tv_off.sh' //NOT REQUIRED
+const customScripts = [
+    {trigger: "tv_on", path: "/home/onhq/tvScripts/tv_on.sh"},
+    {trigger: "tv_off", path: "/home/onhq/tvScripts/tv_off.sh"}
+]
+const startupCommands = [
+    `sudo echo 20 > /sys/class/gpio/export`,
+    `sudo echo "out" > /sys/class/gpio/gpio20/direction`,
+    `sudo echo 21 > /sys/class/gpio/export`,
+    `sudo echo "out" > /sys/class/gpio/gpio21/direction`
+]
 
 const initialStartup = () => {
-    console.log(`\n\n----------------- STARTUP COMMANDS -----------------\n`)
-
-    execCommand(`sudo echo 20 > /sys/class/gpio/export`)
-    execCommand(`sudo echo "out" > /sys/class/gpio/gpio20/direction`)
-
-    execCommand(`sudo echo 21 > /sys/class/gpio/export`)
-    execCommand(`sudo echo "out" > /sys/class/gpio/gpio21/direction`)
-
-    setTimeout(function(){
-        console.log(`\n\n\n\n\n\n\n----------------- SERVER IS READY -----------------\n`)
-    }, 3000)
+    startupCommands.forEach((command) => {
+        execCommand(command)
+    })
 }
 
 const execCommand = async (command) => {
@@ -37,46 +37,50 @@ const execCommand = async (command) => {
 }
 
 const requestListener = (req, res) => {
-    if(req.url !== '/favicon.ico') {
-        console.log(`\n\n----------------- ${req.url} -----------------\n`)
-    }
+    if(req.url === '/favicon.ico') return
 
-    if(req.url.includes('export') && !req.url.includes('unexport')) {
-        execCommand(`sudo echo ${req.url.substring(7)} > /sys/class/gpio/export`)
-    }
+    console.log(`\n\n----------------- ${req.url} -----------------\n`)
 
-    if(req.url.includes('unexport')) {
-        execCommand(`sudo echo ${req.url.substring(9)} > /sys/class/gpio/unexport`)
-    }
+    const requestType = req.url.split(/[0-9]+/)[0];
+    const pin = req.url.match(/\d+/);
+    const state = req.url.match(/-(\d+)/)[1];
 
-    if(req.url.includes('out')) {
-        execCommand(`sudo echo "out" > /sys/class/gpio/gpio${req.url.substring(4)}/direction`)
-    }
+    switch(requestType) {
+        case "/export":
+            execCommand(`sudo echo ${pin} > /sys/class/gpio/export`)
+            break
 
-    if(req.url.includes('gpio')) {
-        execCommand(`sudo echo ${req.url.substring(req.url.length-1)} > /sys/class/gpio${req.url.substring(0, req.url.length-2)}/value`)
-    }
+        case "/unexport":
+            execCommand(`sudo echo ${pin} > /sys/class/gpio/unexport`)
+            break
 
-    //OPTIONAL PERSONAL SCRIPTS
+        case "/in":
+            execCommand(`sudo echo "in" > /sys/class/gpio/gpio${pin}/direction`)
+            break
 
-    if(req.url.includes('tv')) {
-        if(req.url.includes('on')) {
-            execCommand(`bash ${tv_on_script}`)
+        case "/out":
+            execCommand(`sudo echo "out" > /sys/class/gpio/gpio${pin}/direction`)
+            break
+
+        case "/gpio":
+            execCommand(`sudo echo ${state} > /sys/class/gpio${pin}/value`)
+            break
+
+        default: {
+            const requestedScript = customScripts.filter((item) => {
+                item === req.url
+            })
+
+            execCommand("bash "+requestedScript.path)
         }
-
-        if(req.url.includes('off')) {
-            execCommand(`bash ${tv_off_script}`)
-        }
     }
-
-    //END
 
     res.writeHead(200)
-    res.end('{"result": "success"}')
+    res.end('OK')
 }
 
 const server = http.createServer(requestListener)
 server.listen(port, () => {
-    console.log('Server is running on port {'+port+'}')
+    console.log(`\n\n\n----------------- SERVER IS RUNNING ON ${port} -----------------\n`)
     initialStartup()
 })
