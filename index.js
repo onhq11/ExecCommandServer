@@ -3,8 +3,8 @@ const { exec } = require('child_process')
 
 const port = 41420
 const customScripts = [
-    {trigger: "tv_on", path: "/home/onhq/tvScripts/tv_on.sh"},
-    {trigger: "tv_off", path: "/home/onhq/tvScripts/tv_off.sh"}
+    {trigger: "/tv_on", path: "/home/onhq/tvScripts/tv_on.sh"},
+    {trigger: "/tv_off", path: "/home/onhq/tvScripts/tv_off.sh"}
 ]
 const startupCommands = [
     `sudo echo 20 > /sys/class/gpio/export`,
@@ -43,7 +43,7 @@ const requestListener = (req, res) => {
 
     const requestType = req.url.split(/[0-9]+/)[0];
     const pin = req.url.match(/\d+/);
-    const state = req.url.match(/-(\d+)/)[1];
+    const state = req.url.match(/-(\d+)/)?.[1];
 
     switch(requestType) {
         case "/export":
@@ -67,10 +67,7 @@ const requestListener = (req, res) => {
             break
 
         default: {
-            const requestedScript = customScripts.filter((item) => {
-                item === req.url
-            })
-
+            const requestedScript = customScripts.find(item => item.trigger === req.url)
             execCommand("bash "+requestedScript.path)
         }
     }
