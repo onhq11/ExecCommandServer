@@ -63,7 +63,7 @@ const requestListener = (req, res) => {
             break
 
         case "/gpio":
-            execCommand(`sudo echo ${state} > /sys/class/gpio${pin}/value`)
+            execCommand(`sudo echo ${state} > /sys/class/gpio/gpio${pin}/value`)
             break
 
         default: {
